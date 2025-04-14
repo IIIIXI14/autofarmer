@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "956156702677",
+    "firebase_url": "https://autofarmer-d3d99-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "autofarmer-d3d99",
+    "storage_bucket": "autofarmer-d3d99.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:956156702677:android:6bcf73cf0ee438446a175c",
+        "android_client_info": {
+          "package_name": "com.example.autofarmer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJ-oTE_m-65E6XHf6a5THwBPbGFW_5D6E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

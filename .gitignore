@@ -1,0 +1,23 @@
+# Flutter
+.build/
+.dart_tool/
+.packages
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+.vscode/
+android/.gradle/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+macos/Flutter/Flutter.framework
+
+# Firebase config
+firebase_options.dart
+
+# Others
+*.iml
+*.log
+*.lock
+*.DS_Store
