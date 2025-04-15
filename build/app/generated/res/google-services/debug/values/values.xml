@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="firebase_database_url" translatable="false">https://autofarmer-d3d99-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+    <string name="gcm_defaultSenderId" translatable="false">956156702677</string>
+    <string name="google_api_key" translatable="false">AIzaSyCJ-oTE_m-65E6XHf6a5THwBPbGFW_5D6E</string>
+    <string name="google_app_id" translatable="false">1:956156702677:android:6bcf73cf0ee438446a175c</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyCJ-oTE_m-65E6XHf6a5THwBPbGFW_5D6E</string>
+    <string name="google_storage_bucket" translatable="false">autofarmer-d3d99.firebasestorage.app</string>
+    <string name="project_id" translatable="false">autofarmer-d3d99</string>
+</resources>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +19,7 @@ class AutoFarmerApp extends StatelessWidget {
     return MaterialApp(
       title: 'AutoFarmer',
       theme: ThemeData(primarySwatch: Colors.green),
-      home: const Scaffold(
-        body: Center(child: Text('Welcome to AutoFarmer 🚜')),
-      ),
+      home: const LoginScreen(),
     );
   }
 }

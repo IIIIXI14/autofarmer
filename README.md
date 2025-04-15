@@ -1,22 +1,23 @@
-# 🌾 AutoFarmer
+## ✅ Day 2: Firebase Authentication + Build Setup Fixes
 
-A smart agriculture app using Flutter + Firebase + ESP8266.
+### 🔐 Features Implemented:
+- Firebase Email/Password Login & Signup
+- Login/Signup UI screens with error handling
+- Home screen routing after login
 
-## 📦 Features
-- Real-time Sensor Monitoring
-- 6 Device Control via Firebase
-- QR-based ESP8266 Pairing
-- Multilingual UI (12 Indian languages)
+### 🛠️ Android Build Fixes:
+- Migrated JVM toolchain to Java 17
+- Fixed NDK version mismatch (NDK 27)
+- Enabled core library desugaring for QR scanner support
+- Replaced broken `qr_code_scanner` with stable `mobile_scanner` (recommended)
 
-## 🔧 Tech Stack
-- Flutter + Dart
-- Firebase Auth, Firestore
-- ESP8266 + Arduino
-- QR Scanner
+### 🔧 Configuration Done:
+- Updated `build.gradle.kts` for:
+  - `ndkVersion = "27.0.12077973"`
+  - `kotlinOptions { jvmTarget = "17" }`
+  - `compileOptions` to use `JavaVersion.VERSION_17`
+- Added `gradle.properties` to use correct JDK path
 
----
-
-## 🚀 Day 1 Progress
-- ✅ Project Setup
-- ✅ Firebase Integration
-- ✅ ESP8266 Blink Test
+### 🧪 Tested:
+- Login → redirects to dashboard
+- Register new account
