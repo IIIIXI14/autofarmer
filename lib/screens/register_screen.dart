@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/user_model.dart';
 import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -14,16 +16,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  String _selectedLanguage = 'en';
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
+
+  final List<Map<String, String>> _languages = [
+    {'code': 'en', 'name': 'English'},
+    {'code': 'es', 'name': 'Spanish'},
+    {'code': 'fr', 'name': 'French'},
+    {'code': 'de', 'name': 'German'},
+    {'code': 'hi', 'name': 'Hindi'},
+  ];
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -58,6 +73,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  String? _validateName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Name is required';
+    }
+    if (value.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Phone number is required';
+    }
+    if (!RegExp(r'^\+?[\d\s-]{10,}$').hasMatch(value)) {
+      return 'Please enter a valid phone number';
+    }
+    return null;
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -67,10 +102,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
+      // 1. Create Firebase Auth account
       final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // 2. Create user profile in Firestore
+      final user = UserModel(
+        uid: userCredential.user!.uid,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        preferredLanguage: _selectedLanguage,
+      );
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set(user.toMap());
 
       if (!mounted) return;
 
@@ -154,6 +204,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 48),
                   
+                  // Name Field
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      hintText: 'Enter your full name',
+                      prefixIcon: Icon(Icons.person_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: _validateName,
+                    enabled: !_isLoading,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 16),
+                  
                   // Email Field
                   TextFormField(
                     controller: _emailController,
@@ -167,6 +232,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     validator: _validateEmail,
                     enabled: !_isLoading,
                     autocorrect: false,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Phone Field
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      hintText: 'Enter your phone number',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: _validatePhone,
+                    enabled: !_isLoading,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Language Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedLanguage,
+                    decoration: const InputDecoration(
+                      labelText: 'Preferred Language',
+                      prefixIcon: Icon(Icons.language),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _languages.map((language) {
+                      return DropdownMenuItem(
+                        value: language['code'],
+                        child: Text(language['name']!),
+                      );
+                    }).toList(),
+                    onChanged: _isLoading ? null : (value) {
+                      setState(() => _selectedLanguage = value!);
+                    },
                   ),
                   const SizedBox(height: 16),
                   
