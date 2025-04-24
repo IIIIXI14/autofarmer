@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.autofarmer.app-mergeDebugResources-5:/values-sw/values-sw.xml",
+            "outputFile": "com.example.autofarmer.app-mergeDebugResources-4:/values-sw/values-sw.xml",
             "map": [
                 {
                     "source": "C:\\Users\\Harshal\\scoop\\apps\\gradle\\current\\.gradle\\caches\\8.10.2\\transforms\\3bd6afadb1d2da08d072910940e05d5e\\transformed\\jetified-play-services-base-18.5.0\\res\\values-sw\\values.xml",

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../services/notification_service.dart';
 import 'login_screen.dart';
-import 'sensor_data_screen.dart';
+import 'device_manager_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +20,36 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    try {
+      // Load user data first
+      await _loadUserData();
+
+      // Initialize notifications only after user data is loaded
+      if (mounted) {
+        NotificationService.instance.initialize().catchError((e) {
+          debugPrint('Warning: Failed to initialize notifications: $e');
+          // We'll continue even if notifications fail
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -39,13 +69,56 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(currentUser.uid)
           .get();
 
-      if (doc.exists && mounted) {
+      if (!mounted) return;
+
+      if (doc.exists) {
+        try {
+          final userData = doc.data() ?? {};
+          // Add the uid to the data map
+          userData['uid'] = currentUser.uid;
+          
+          setState(() {
+            _user = UserModel.fromMap(userData);
+            _isLoading = false;
+          });
+        } catch (e) {
+          print('Error parsing user data: $e');
+          // Create a basic user model if parsing fails
+          setState(() {
+            _user = UserModel(
+              uid: currentUser.uid,
+              name: currentUser.displayName ?? 'User',
+              email: currentUser.email ?? '',
+              phone: '',
+              preferredLanguage: 'en',
+            );
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Create a new user document if it doesn't exist
+        final newUser = UserModel(
+          uid: currentUser.uid,
+          name: currentUser.displayName ?? 'User',
+          email: currentUser.email ?? '',
+          phone: '',
+          preferredLanguage: 'en',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .set(newUser.toMap());
+
         setState(() {
-          _user = UserModel.fromMap(doc.data()!);
+          _user = newUser;
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('Error loading user data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -79,14 +152,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navigateToSensorData() {
+  void _navigateToDeviceManager() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => SensorDataScreen(
-          deviceId: _user?.uid ?? '',
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const DeviceManagerScreen()),
     );
   }
 
@@ -104,6 +173,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('Welcome, ${_user?.name ?? 'Farmer'}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.devices),
+            onPressed: _navigateToDeviceManager,
+            tooltip: 'Device Manager',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _signOut,
@@ -178,13 +252,13 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               Card(
                 child: InkWell(
-                  onTap: _navigateToSensorData,
+                  onTap: _navigateToDeviceManager,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
                       children: [
                         Icon(
-                          Icons.sensors,
+                          Icons.devices,
                           size: 24,
                           color: Theme.of(context).primaryColor,
                         ),
@@ -194,14 +268,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Farm Monitor',
+                                'Device Manager',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               Text(
-                                'View sensor data and control farm devices',
+                                'Add, remove, and manage your farm devices',
                                 style: TextStyle(
                                   color: Colors.grey,
                                 ),
@@ -252,22 +326,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getLanguageName(String code) {
-    const Map<String, String> languages = {
-      'en': 'English',
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-      'hi': 'Hindi',
-      'bn': 'Bengali',
-      'ta': 'Tamil',
-      'te': 'Telugu',
-      'mr': 'Marathi',
-      'ml': 'Malayalam',
-      'pa': 'Punjabi',
-      'gu': 'Gujarati',
-      'kn': 'Kannada',
-    };
-    return languages[code] ?? code;
+    switch (code.toLowerCase()) {
+      case 'en':
+        return 'English';
+      case 'hi':
+        return 'Hindi';
+      case 'mr':
+        return 'Marathi';
+      default:
+        return code;
+    }
   }
 
   String _formatDate(DateTime? date) {

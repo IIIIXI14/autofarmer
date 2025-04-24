@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.autofarmer.app-mergeDebugResources-5:/values-en-rAU/values-en-rAU.xml",
+            "outputFile": "com.example.autofarmer.app-mergeDebugResources-4:/values-en-rAU/values-en-rAU.xml",
             "map": [
                 {
                     "source": "C:\\Users\\Harshal\\scoop\\apps\\gradle\\current\\.gradle\\caches\\8.10.2\\transforms\\761411e951a3644118e03eb9f7508fc6\\transformed\\browser-1.4.0\\res\\values-en-rAU\\values-en-rAU.xml",

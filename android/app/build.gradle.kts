@@ -12,13 +12,12 @@ kotlin {
     jvmToolchain(17)
 }
 
-
 android {
     namespace = "com.example.autofarmer"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
-        compileOptions {
+    compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true

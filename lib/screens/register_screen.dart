@@ -3,9 +3,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final String? initialEmail;
+
+  const RegisterScreen({
+    super.key,
+    this.initialEmail,
+  });
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -13,7 +19,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -31,6 +37,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     {'code': 'de', 'name': 'German'},
     {'code': 'hi', 'name': 'Hindi'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
 
   @override
   void dispose() {
@@ -94,14 +106,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    // Clear any previous error messages
+    setState(() => _errorMessage = null);
+    
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() => _isLoading = true);
 
     try {
+      // First check if email exists
+      final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(_emailController.text.trim());
+      if (methods.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'This email is already registered. Please try logging in instead.';
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(_errorMessage!),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Login',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
       // 1. Create Firebase Auth account
       final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -135,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String message;
       switch (e.code) {
         case 'email-already-in-use':
-          message = 'This email is already registered';
+          message = 'This email is already registered. Please try logging in instead.';
           break;
         case 'invalid-email':
           message = 'Please enter a valid email address';
@@ -153,19 +202,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(message),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          action: e.code == 'email-already-in-use' ? SnackBarAction(
+            label: 'Login',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+          ) : null,
         ),
       );
     } catch (e) {
       setState(() => _errorMessage = 'An unexpected error occurred');
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('An unexpected error occurred'),
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('An unexpected error occurred'),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 5),
         ),
       );
     } finally {
@@ -223,11 +298,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Email',
                       hintText: 'Enter your email',
-                      prefixIcon: Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: const OutlineInputBorder(),
+                      errorText: _errorMessage,
                     ),
                     validator: _validateEmail,
                     enabled: !_isLoading,
@@ -280,7 +356,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() => _obscurePassword = !_obscurePassword);
@@ -303,7 +379,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
@@ -315,17 +391,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     enabled: !_isLoading,
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Error Message
-                  if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
                   
                   // Register Button
                   ElevatedButton(
@@ -346,25 +411,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           )
                         : const Text(
                             'Create Account',
-                            style: TextStyle(fontSize: 16, color: Colors.white),
+                            style: TextStyle(fontSize: 16),
                           ),
                   ),
                   const SizedBox(height: 16),
                   
                   // Login Link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Already have an account?'),
-                      TextButton(
-                        onPressed: _isLoading ? null : () => Navigator.pop(context),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(color: Colors.green),
+                  if (!_isLoading)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Already have an account?'),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            );
+                          },
+                          child: const Text('Login'),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),

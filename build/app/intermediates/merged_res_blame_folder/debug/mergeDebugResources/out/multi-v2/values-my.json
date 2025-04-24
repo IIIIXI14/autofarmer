@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.autofarmer.app-mergeDebugResources-5:/values-my/values-my.xml",
+            "outputFile": "com.example.autofarmer.app-mergeDebugResources-4:/values-my/values-my.xml",
             "map": [
                 {
                     "source": "C:\\Users\\Harshal\\scoop\\apps\\gradle\\current\\.gradle\\caches\\8.10.2\\transforms\\761411e951a3644118e03eb9f7508fc6\\transformed\\browser-1.4.0\\res\\values-my\\values-my.xml",

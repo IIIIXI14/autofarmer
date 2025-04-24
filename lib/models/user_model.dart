@@ -4,8 +4,8 @@ class UserModel {
   final String email;
   final String phone;
   final String preferredLanguage;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   UserModel({
     required this.uid,
@@ -13,11 +13,9 @@ class UserModel {
     required this.email,
     required this.phone,
     required this.preferredLanguage,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) : 
-    this.createdAt = createdAt ?? DateTime.now(),
-    this.updatedAt = updatedAt ?? DateTime.now();
+    this.createdAt,
+    this.updatedAt,
+  });
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,24 +24,33 @@ class UserModel {
       'email': email,
       'phone': phone,
       'preferredLanguage': preferredLanguage,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    // Handle both Timestamp and String formats for dates
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is String) return DateTime.parse(value);
+      if (value is DateTime) return value;
+      if (value.runtimeType.toString() == 'Timestamp') {
+        return DateTime.fromMillisecondsSinceEpoch(
+          (value.seconds * 1000 + value.milliseconds).toInt()
+        );
+      }
+      return null;
+    }
+
     return UserModel(
-      uid: map['uid'] ?? '',
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      phone: map['phone'] ?? '',
-      preferredLanguage: map['preferredLanguage'] ?? 'en',
-      createdAt: map['createdAt'] != null 
-        ? DateTime.parse(map['createdAt']) 
-        : null,
-      updatedAt: map['updatedAt'] != null 
-        ? DateTime.parse(map['updatedAt']) 
-        : null,
+      uid: map['uid']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      phone: map['phone']?.toString() ?? '',
+      preferredLanguage: map['preferredLanguage']?.toString() ?? 'en',
+      createdAt: parseDate(map['createdAt']),
+      updatedAt: parseDate(map['updatedAt']),
     );
   }
 

@@ -42,7 +42,7 @@
       "intermediatesFolder": "C:\\Users\\Harshal\\Desktop\\autofarmer\\build\\app\\intermediates\\cxx",
       "gradleModulePathName": ":app",
       "moduleRootFolder": "C:\\Users\\Harshal\\Desktop\\autofarmer\\android\\app",
-      "moduleBuildFile": "C:\\Users\\Harshal\\Desktop\\autofarmer\\android\\app\\build.gradle.kts",
+      "moduleBuildFile": "C:\\Users\\Harshal\\Desktop\\autofarmer\\android\\app\\build.gradle",
       "makeFile": "C:\\Users\\Harshal\\Downloads\\flutter\\packages\\flutter_tools\\gradle\\src\\main\\groovy\\CMakeLists.txt",
       "buildSystem": "CMAKE",
       "ndkFolder": "C:\\Users\\Harshal\\AppData\\Local\\Android\\Sdk\\ndk\\27.0.12077973",
