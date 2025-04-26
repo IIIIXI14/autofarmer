@@ -3,12 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
+import 'device_manager_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  _LoginScreenState createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -45,244 +47,33 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  Future<void> _login() async {
+  Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      print('DEBUG: Starting login process...');
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-
-      print('DEBUG: Attempting to sign in with email: $email');
-
-      // Attempt login directly
-      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-
-      if (userCredential.user == null) {
-        throw Exception('Login succeeded but user is null');
-      }
-
-      print('DEBUG: Login successful');
-      print('DEBUG: User ID: ${userCredential.user?.uid}');
-
-      if (!mounted) return;
-
-      // Get user data from Firestore
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userCredential.user?.uid)
-            .get();
-
-        print('DEBUG: Firestore document exists: ${userDoc.exists}');
-
-        if (!userDoc.exists) {
-          print('DEBUG: Creating new user document in Firestore');
-          // Create a new user document if it doesn't exist
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userCredential.user?.uid)
-              .set({
-            'uid': userCredential.user?.uid,
-            'email': email,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        } else {
-          // Update last login time
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userCredential.user?.uid)
-              .update({
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        }
-      } catch (e) {
-        print('DEBUG: Firestore error (non-fatal): $e');
-      }
-
-      if (!mounted) return;
-
-      // Navigate to home screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      print('DEBUG: FirebaseAuthException caught');
-      print('DEBUG: Error code: ${e.code}');
-      print('DEBUG: Error message: ${e.message}');
-
-      if (!mounted) return;
-
-      String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No account found with this email. Would you like to create one?';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 6),
-              action: SnackBarAction(
-                label: 'Create Account',
-                textColor: Colors.white,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RegisterScreen(initialEmail: _emailController.text.trim()),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-          break;
-        case 'wrong-password':
-          message = 'Invalid password. Please try again';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        case 'invalid-credential':
-          message = 'Invalid email or password';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        case 'invalid-email':
-          message = 'Invalid email format';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        case 'user-disabled':
-          message = 'This account has been disabled';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        case 'too-many-requests':
-          message = 'Too many attempts. Please try again later';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        case 'network-request-failed':
-          message = 'Network error. Please check your connection';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          break;
-        default:
-          message = e.message ?? 'Login failed. Please try again';
-          print('DEBUG: Unhandled error code: ${e.code}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(message)),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-      }
-    } catch (e) {
-      print('DEBUG: Unexpected error during login: $e');
       
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Login error: ${e.toString()}')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An error occurred. Please try again.';
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -302,6 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('AutoFarmer Login'),
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -312,6 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Logo or App Name
                   const Text(
                     'AutoFarmer',
                     style: TextStyle(
@@ -323,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
                   
+                  // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -335,10 +132,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: _validateEmail,
                     enabled: !_isLoading,
                     autocorrect: false,
-                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
                   
+                  // Password Field
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -346,7 +143,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: 'Password',
                       hintText: 'Enter your password',
                       prefixIcon: const Icon(Icons.lock_outline),
-                      border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -355,16 +151,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           setState(() => _obscurePassword = !_obscurePassword);
                         },
                       ),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: _validatePassword,
                     enabled: !_isLoading,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _login(),
                   ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   
+                  // Login Button
                   ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: _isLoading ? null : _signIn,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Colors.green,
@@ -384,19 +188,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(fontSize: 16),
                           ),
                   ),
-                  if (!_isLoading) ...[
-                    const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                  
+                  // Register Link
+                  if (!_isLoading)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("Don't have an account?"),
+                        const Text('Don\'t have an account?'),
                         TextButton(
                           onPressed: _navigateToRegister,
-                          child: const Text('Create Account'),
+                          child: const Text('Register'),
                         ),
                       ],
                     ),
-                  ],
                 ],
               ),
             ),

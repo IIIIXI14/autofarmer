@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/sensor_history_model.dart';
-import '../services/notification_service.dart';
 
 class SensorHistoryScreen extends StatefulWidget {
   final String deviceId;
@@ -43,16 +42,6 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
               .toList();
           _error = null;
           _isLoading = false;
-
-          // Check latest reading for critical values
-          if (_historyData.isNotEmpty) {
-            final latest = _historyData.first;
-            NotificationService.instance.checkCriticalValues(
-              temperature: latest.temperature,
-              humidity: latest.humidity,
-              soilMoisture: latest.soilMoisture,
-            );
-          }
         });
       },
       onError: (error) {

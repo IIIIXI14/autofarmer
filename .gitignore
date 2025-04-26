@@ -21,3 +21,16 @@ firebase_options.dart
 *.log
 *.lock
 *.DS_Store
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.ipa
+
+# Large asset files
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz

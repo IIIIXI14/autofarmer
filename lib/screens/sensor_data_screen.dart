@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/sensor_data_model.dart';
 import '../models/actuator_state_model.dart';
-import '../services/notification_service.dart';
 import 'sensor_history_screen.dart';
 
 class SensorDataScreen extends StatefulWidget {
@@ -27,7 +26,6 @@ class _SensorDataScreenState extends State<SensorDataScreen> {
   void initState() {
     super.initState();
     _setupListeners();
-    NotificationService.instance.initialize();
   }
 
   void _setupListeners() {
@@ -42,13 +40,6 @@ class _SensorDataScreenState extends State<SensorDataScreen> {
           if (snapshot.exists) {
             _sensorData = SensorDataModel.fromMap(snapshot.data()!);
             _error = null;
-
-            // Check for critical values
-            NotificationService.instance.checkCriticalValues(
-              temperature: _sensorData!.temperature,
-              humidity: _sensorData!.humidity,
-              soilMoisture: _sensorData!.soilMoisture,
-            );
           }
           _isLoading = false;
         });

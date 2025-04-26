@@ -1,36 +1,21 @@
 name: autofarmer
-description: A smart agriculture automation project.
+description: A new Flutter project.
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.1.0
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.0.6 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-
-  # Firebase + Plugins
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
-  firebase_auth_web: ^5.8.12
-  cloud_firestore: ^4.13.6
-  cloud_firestore_web: ^3.8.12
-  firebase_messaging: ^14.7.10
-  fl_chart: ^0.65.0
-
-  # QR Scanner
-  mobile_scanner: ^6.0.7
-
-  # State Management
-  provider: ^6.1.1
-
-  # Localization
-  flutter_localizations:
-    sdk: flutter
-
-  # Icons
   cupertino_icons: ^1.0.2
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.16.0
+  cloud_firestore: ^4.17.5
+  provider: ^6.0.5
+  barcode_scan2: ^4.3.0
+  fl_chart: ^0.66.2
 
 dev_dependencies:
   flutter_test:
@@ -39,3 +24,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

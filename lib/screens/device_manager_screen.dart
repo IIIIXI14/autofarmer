@@ -1,93 +1,76 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:barcode_scan2/barcode_scan2.dart';
+import 'dart:convert';
+import '../services/device_service.dart';
+import '../models/device.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/device_model.dart';
-import 'qr_scanner_screen.dart';
-import 'sensor_data_screen.dart';
 
 class DeviceManagerScreen extends StatefulWidget {
   const DeviceManagerScreen({Key? key}) : super(key: key);
 
   @override
-  State<DeviceManagerScreen> createState() => _DeviceManagerScreenState();
+  _DeviceManagerScreenState createState() => _DeviceManagerScreenState();
 }
 
 class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
-  List<DeviceModel> _devices = [];
-  bool _isLoading = true;
-  String? _error;
+  bool isScanning = false;
+  final TextEditingController _deviceNameController = TextEditingController();
+  final TextEditingController _deviceIdController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _setupListener();
+  void dispose() {
+    _deviceNameController.dispose();
+    _deviceIdController.dispose();
+    super.dispose();
   }
 
-  void _setupListener() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        _error = 'User not authenticated';
-        _isLoading = false;
-      });
-      return;
-    }
+  Future<void> _handleQRScan(String qrData) async {
+    try {
+      final data = Map<String, dynamic>.from(json.decode(qrData));
+      final deviceId = data['deviceId'] as String;
+      final secretKey = data['secretKey'] as String;
 
-    FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('devices')
-        .snapshots()
-        .listen(
-      (snapshot) {
+      if (secretKey == 'farm123secure') {
+        final deviceService = Provider.of<DeviceService>(context, listen: false);
+        await deviceService.addDevice(
+          deviceId,
+          'New Device',
+          'Set Location',
+        );
         setState(() {
-          _devices = snapshot.docs
-              .map((doc) => DeviceModel.fromMap(doc.data()))
-              .toList();
-          _error = null;
-          _isLoading = false;
+          isScanning = false;
         });
-      },
-      onError: (error) {
-        setState(() {
-          _error = 'Error loading devices: $error';
-          _isLoading = false;
-        });
-      },
-    );
-  }
-
-  Future<void> _addDevice() async {
-    if (_devices.length >= 6) {
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid device key')),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Maximum number of devices (6) reached'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const QRScannerScreen()),
-    );
-
-    if (result == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Device added successfully!'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Invalid QR code format')),
       );
     }
   }
 
-  Future<void> _editDevice(DeviceModel device) async {
+  Future<void> _showAddDeviceDialog() async {
+    try {
+      final result = await BarcodeScanner.scan();
+      if (result.rawContent.isNotEmpty) {
+        await _handleQRScan(result.rawContent);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error scanning QR code: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _showEditDeviceDialog(Device device) {
     final nameController = TextEditingController(text: device.name);
     final locationController = TextEditingController(text: device.location);
 
-    final result = await showDialog<Map<String, String>>(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Device'),
@@ -96,18 +79,11 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Device Name',
-                hintText: 'Enter device name',
-              ),
+              decoration: const InputDecoration(labelText: 'Device Name'),
             ),
-            const SizedBox(height: 16),
             TextField(
               controller: locationController,
-              decoration: const InputDecoration(
-                labelText: 'Location',
-                hintText: 'Enter device location',
-              ),
+              decoration: const InputDecoration(labelText: 'Location'),
             ),
           ],
         ),
@@ -117,104 +93,33 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, {
-              'name': nameController.text.trim(),
-              'location': locationController.text.trim(),
-            }),
+            onPressed: () async {
+              final deviceService =
+                  Provider.of<DeviceService>(context, listen: false);
+              await deviceService.updateDevice(
+                device.id,
+                nameController.text,
+                locationController.text,
+              );
+              Navigator.pop(context);
+            },
             child: const Text('Save'),
           ),
         ],
       ),
     );
+  }
 
-    if (result != null && mounted) {
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) throw 'User not authenticated';
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('devices')
-            .doc(device.id)
-            .update({
-          'name': result['name'],
-          'location': result['location'],
-        });
-
+  Future<void> _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Device updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating device: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error signing out: ${e.toString()}')),
         );
       }
     }
-  }
-
-  Future<void> _deleteDevice(DeviceModel device) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Device'),
-        content: Text('Are you sure you want to delete ${device.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) throw 'User not authenticated';
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('devices')
-            .doc(device.id)
-            .delete();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Device deleted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting device: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _navigateToDevice(DeviceModel device) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SensorDataScreen(deviceId: device.id),
-      ),
-    );
   }
 
   @override
@@ -223,109 +128,104 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
       appBar: AppBar(
         title: const Text('Device Manager'),
         actions: [
-          if (_devices.length < 6)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _addDevice,
-              tooltip: 'Add Device',
-            ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddDeviceDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _signOut,
+            tooltip: 'Sign Out',
+          ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                )
-              : _devices.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'No devices added yet',
-                            style: TextStyle(fontSize: 18),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _addDevice,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Device'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        setState(() => _isLoading = true);
-                        _setupListener();
-                      },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(8),
-                        itemCount: _devices.length,
-                        itemBuilder: (context, index) {
-                          final device = _devices[index];
-                          return Card(
-                            child: ListTile(
-                              leading: Stack(
-                                children: [
-                                  const Icon(Icons.memory, size: 32),
-                                  Positioned(
-                                    right: 0,
-                                    bottom: 0,
-                                    child: Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: device.isActiveNow
-                                            ? Colors.green
-                                            : Colors.grey,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              title: Text(device.name),
-                              subtitle: Text(device.location),
-                              trailing: PopupMenuButton(
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _editDevice(device);
-                                      break;
-                                    case 'delete':
-                                      _deleteDevice(device);
-                                      break;
-                                  }
-                                },
-                              ),
-                              onTap: () => _navigateToDevice(device),
+      body: StreamBuilder<List<Device>>(
+        stream: Provider.of<DeviceService>(context).getDevices(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final devices = snapshot.data!;
+
+          if (devices.isEmpty) {
+            return const Center(
+              child: Text('No devices added yet. Tap + to add a device.'),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: devices.length,
+            itemBuilder: (context, index) {
+              final device = devices[index];
+              return ListTile(
+                leading: const Icon(Icons.memory),
+                title: Text(device.name),
+                subtitle: Text(device.location),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      device.isOnline ? Icons.circle : Icons.circle_outlined,
+                      color: device.isOnline ? Colors.green : Colors.grey,
+                    ),
+                    PopupMenuButton<String>(
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                      ],
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          _showEditDeviceDialog(device);
+                        } else if (value == 'delete') {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Device'),
+                              content: Text(
+                                  'Are you sure you want to delete ${device.name}?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
                             ),
                           );
-                        },
-                      ),
+
+                          if (confirmed == true) {
+                            final deviceService =
+                                Provider.of<DeviceService>(context, listen: false);
+                            await deviceService.deleteDevice(device.id);
+                          }
+                        }
+                      },
                     ),
+                  ],
+                ),
+                onTap: () {
+                  // Navigate to device dashboard
+                  // TODO: Implement device dashboard navigation
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 } 
