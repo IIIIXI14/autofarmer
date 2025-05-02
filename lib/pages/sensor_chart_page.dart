@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/sensor_reading.dart';
 import '../utils/chart_utils.dart';
+import '../services/alerts_service.dart';
 
 class SensorChartPage extends StatelessWidget {
   final String deviceId;
@@ -22,6 +23,41 @@ class SensorChartPage extends StatelessWidget {
             .toList()
             .reversed
             .toList());
+  }
+
+  Widget _buildAlertBanners(List<AlertInfo> alerts) {
+    if (alerts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: alerts.map((alert) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: alert.color,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                alert.message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Icon(
+              alert.severity == AlertSeverity.critical 
+                ? Icons.warning_amber_rounded
+                : Icons.info_outline,
+              color: Colors.white,
+            ),
+          ],
+        ),
+      )).toList(),
+    );
   }
 
   @override
@@ -51,12 +87,23 @@ class SensorChartPage extends StatelessWidget {
           }
 
           final readings = snapshot.data!;
+          final currentReading = readings.last;
+          final alerts = AlertsService.checkAlerts(currentReading);
+          
+          // Log alerts to Firestore if any
+          if (alerts.isNotEmpty) {
+            for (var alert in alerts) {
+              AlertsService.logAlert(deviceId, alert);
+            }
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildAlertBanners(alerts),
+                const SizedBox(height: 16),
                 _buildLatestReadings(readings.last),
                 const SizedBox(height: 24),
                 _buildChart(
