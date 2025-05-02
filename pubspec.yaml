@@ -1,21 +1,24 @@
 name: autofarmer
-description: A new Flutter project.
+description: A smart farming solution
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.6 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  firebase_core: ^2.32.0
+  cloud_firestore: ^4.14.0
+  firebase_core: ^2.24.2
   firebase_auth: ^4.16.0
-  cloud_firestore: ^4.17.5
   provider: ^6.0.5
-  barcode_scan2: ^4.3.0
-  fl_chart: ^0.66.2
+  fl_chart: ^0.65.0
+  shared_preferences: ^2.2.2
+  connectivity_plus: ^5.0.2
+  archive: ^3.4.9
+  barcode_scan2: ^4.5.1
 
 dev_dependencies:
   flutter_test:

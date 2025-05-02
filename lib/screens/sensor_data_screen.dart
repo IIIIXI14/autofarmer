@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sensor_data_model.dart';
 import '../models/actuator_state_model.dart';
+import '../services/data_validation_service.dart';
+import '../services/cache_service.dart';
+import '../services/retry_service.dart';
 import 'sensor_history_screen.dart';
+import 'actuator_control_screen.dart';
+import 'package:flutter/rendering.dart';
 
 class SensorDataScreen extends StatefulWidget {
   final String deviceId;
@@ -16,102 +24,211 @@ class SensorDataScreen extends StatefulWidget {
   State<SensorDataScreen> createState() => _SensorDataScreenState();
 }
 
-class _SensorDataScreenState extends State<SensorDataScreen> {
+class _SensorDataScreenState extends State<SensorDataScreen> with AutomaticKeepAliveClientMixin {
   SensorDataModel? _sensorData;
   ActuatorStateModel? _actuatorState;
   bool _isLoading = true;
   String? _error;
+  StreamSubscription? _sensorSubscription;
+  StreamSubscription? _actuatorSubscription;
+  late CacheService _cacheService;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    _initializeCache();
     _setupListeners();
   }
 
+  Future<void> _initializeCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cacheService = CacheService(prefs);
+  }
+
+  @override
+  void dispose() {
+    _sensorSubscription?.cancel();
+    _actuatorSubscription?.cancel();
+    super.dispose();
+  }
+
   void _setupListeners() {
+    _sensorSubscription?.cancel();
+    _actuatorSubscription?.cancel();
+
+    // Load cached data first
+    _loadCachedData();
+
     // Listen to sensor data updates
-    FirebaseFirestore.instance
+    _sensorSubscription = FirebaseFirestore.instance
         .collection('sensors_data')
         .doc(widget.deviceId)
         .snapshots()
         .listen(
-      (snapshot) {
-        setState(() {
-          if (snapshot.exists) {
-            _sensorData = SensorDataModel.fromMap(snapshot.data()!);
-            _error = null;
+      (snapshot) async {
+        if (mounted) {
+          try {
+            if (snapshot.exists && snapshot.data() != null) {
+              final validationError = DataValidationService.validateSensorData(snapshot.data()!);
+              if (validationError != null) {
+                setState(() {
+                  _error = validationError;
+                  _isLoading = false;
+                });
+                return;
+              }
+
+              final sensorData = SensorDataModel.fromMap(snapshot.data()!);
+              await _cacheService.cacheSensorData(widget.deviceId, sensorData);
+              
+              setState(() {
+                _sensorData = sensorData;
+                _error = null;
+                _isLoading = false;
+              });
+            } else {
+              setState(() {
+                _sensorData = null;
+                _isLoading = false;
+              });
+            }
+          } catch (e) {
+            setState(() {
+              _error = 'Error processing sensor data: $e';
+              _isLoading = false;
+            });
           }
-          _isLoading = false;
-        });
+        }
       },
       onError: (error) {
-        setState(() {
-          _error = 'Error loading sensor data: $error';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _error = 'Error loading sensor data: $error';
+            _isLoading = false;
+          });
+        }
       },
     );
 
     // Listen to actuator state updates
-    FirebaseFirestore.instance
+    _actuatorSubscription = FirebaseFirestore.instance
         .collection('actuators')
         .doc(widget.deviceId)
         .snapshots()
         .listen(
-      (snapshot) {
-        setState(() {
-          if (snapshot.exists) {
-            _actuatorState = ActuatorStateModel.fromMap(snapshot.data()!);
-          } else {
-            // Initialize with default values if document doesn't exist
-            _actuatorState = ActuatorStateModel(
-              motor: false,
-              light: false,
-              waterSupply: false,
-              lastUpdated: DateTime.now(),
-            );
+      (snapshot) async {
+        if (mounted) {
+          try {
+            if (snapshot.exists && snapshot.data() != null) {
+              final validationError = DataValidationService.validateActuatorData(snapshot.data()!);
+              if (validationError != null) {
+                setState(() {
+                  _error = validationError;
+                });
+                return;
+              }
+
+              final actuatorState = ActuatorStateModel.fromMap(snapshot.data()!);
+              await _cacheService.cacheActuatorData(widget.deviceId, actuatorState);
+              
+              setState(() {
+                _actuatorState = actuatorState;
+              });
+            } else {
+              final defaultState = ActuatorStateModel(
+                motor: false,
+                light: false,
+                waterSupply: false,
+                autoMode: false,
+                lastUpdated: DateTime.now(),
+              );
+              await _cacheService.cacheActuatorData(widget.deviceId, defaultState);
+              
+              setState(() {
+                _actuatorState = defaultState;
+              });
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error processing actuator data: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
-        });
+        }
       },
       onError: (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading actuator states: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _loadCachedData() async {
+    try {
+      final cachedSensorData = await _cacheService.getCachedSensorData(widget.deviceId);
+      final cachedActuatorData = await _cacheService.getCachedActuatorData(widget.deviceId);
+
+      if (mounted) {
+        setState(() {
+          if (cachedSensorData != null) {
+            _sensorData = cachedSensorData;
+          }
+          if (cachedActuatorData != null) {
+            _actuatorState = cachedActuatorData;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading actuator states: $error'),
+            content: Text('Error loading cached data: $e'),
             backgroundColor: Colors.red,
           ),
         );
-      },
-    );
-
-    // Store current reading in history
-    if (_sensorData != null) {
-      FirebaseFirestore.instance
-          .collection('sensors_data_history')
-          .doc(widget.deviceId)
-          .collection('readings')
-          .add(_sensorData!.toMap());
+      }
     }
   }
 
   Future<void> _toggleActuator(String type, bool value) async {
     try {
-      final actuatorRef = FirebaseFirestore.instance
-          .collection('actuators')
-          .doc(widget.deviceId);
+      await RetryService.withRetry(
+        operation: () async {
+          final actuatorRef = FirebaseFirestore.instance
+              .collection('actuators')
+              .doc(widget.deviceId);
 
-      Map<String, dynamic> updates = {
-        type: value,
-        'lastUpdated': DateTime.now().toIso8601String(),
-      };
+          Map<String, dynamic> updates = {
+            type: value,
+            'lastUpdated': DateTime.now().toIso8601String(),
+          };
 
-      await actuatorRef.set(updates, SetOptions(merge: true));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating $type: $e'),
-          backgroundColor: Colors.red,
-        ),
+          await actuatorRef.set(updates, SetOptions(merge: true));
+        },
+        shouldRetry: RetryService.isNetworkError,
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating $type: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -277,6 +394,7 @@ class _SensorDataScreenState extends State<SensorDataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Farm Monitor'),
@@ -287,6 +405,20 @@ class _SensorDataScreenState extends State<SensorDataScreen> {
               setState(() => _isLoading = true);
               _setupListeners();
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_remote),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ActuatorControlScreen(
+                    deviceId: widget.deviceId,
+                  ),
+                ),
+              );
+            },
+            tooltip: 'Control Panel',
           ),
         ],
       ),

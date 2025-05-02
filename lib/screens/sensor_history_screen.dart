@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/sensor_history_model.dart';
 
@@ -15,10 +16,14 @@ class SensorHistoryScreen extends StatefulWidget {
   State<SensorHistoryScreen> createState() => _SensorHistoryScreenState();
 }
 
-class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
+class _SensorHistoryScreenState extends State<SensorHistoryScreen> with AutomaticKeepAliveClientMixin {
   List<SensorHistoryModel> _historyData = [];
   bool _isLoading = true;
   String? _error;
+  StreamSubscription? _historySubscription;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -26,8 +31,16 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
     _setupListener();
   }
 
+  @override
+  void dispose() {
+    _historySubscription?.cancel();
+    super.dispose();
+  }
+
   void _setupListener() {
-    FirebaseFirestore.instance
+    _historySubscription?.cancel();
+
+    _historySubscription = FirebaseFirestore.instance
         .collection('sensors_data_history')
         .doc(widget.deviceId)
         .collection('readings')
@@ -36,19 +49,28 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
         .snapshots()
         .listen(
       (snapshot) {
-        setState(() {
-          _historyData = snapshot.docs
-              .map((doc) => SensorHistoryModel.fromMap(doc.data()))
-              .toList();
-          _error = null;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            try {
+              _historyData = snapshot.docs
+                  .map((doc) => SensorHistoryModel.fromMap(doc.data()))
+                  .toList();
+              _error = null;
+            } catch (e) {
+              _error = 'Error parsing history data: $e';
+              _historyData = [];
+            }
+            _isLoading = false;
+          });
+        }
       },
       onError: (error) {
-        setState(() {
-          _error = 'Error loading history data: $error';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _error = 'Error loading history data: $error';
+            _isLoading = false;
+          });
+        }
       },
     );
   }
@@ -59,6 +81,23 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
     Color color,
     String unit,
   ) {
+    if (spots.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: Text(
+              'No $title data available',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -95,16 +134,20 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          final date = DateTime.fromMillisecondsSinceEpoch(
-                            value.toInt(),
-                          );
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              '${date.hour}:${date.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          );
+                          try {
+                            final date = DateTime.fromMillisecondsSinceEpoch(
+                              value.toInt(),
+                            );
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                '${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            );
+                          } catch (e) {
+                            return const SizedBox.shrink();
+                          }
                         },
                         reservedSize: 30,
                       ),
@@ -154,20 +197,25 @@ class _SensorHistoryScreenState extends State<SensorHistoryScreen> {
   }
 
   List<FlSpot> _getSpots(List<SensorHistoryModel> data, String type) {
-    return data.map((reading) {
-      final x = reading.timestamp.millisecondsSinceEpoch.toDouble();
-      final y = switch (type) {
-        'temperature' => reading.temperature,
-        'humidity' => reading.humidity,
-        'soilMoisture' => reading.soilMoisture,
-        _ => 0.0,
-      };
-      return FlSpot(x, y);
-    }).toList().reversed.toList();
+    try {
+      return data.map((reading) {
+        final x = reading.timestamp.millisecondsSinceEpoch.toDouble();
+        final y = switch (type) {
+          'temperature' => reading.temperature,
+          'humidity' => reading.humidity,
+          'soilMoisture' => reading.soilMoisture,
+          _ => 0.0,
+        };
+        return FlSpot(x, y);
+      }).toList().reversed.toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sensor History'),

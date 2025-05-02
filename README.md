@@ -1,106 +1,137 @@
-# AutoFarmer
+# AutoFarmer - Day 9: Firebase Integration and Actuator Control
 
-AutoFarmer is a Flutter application for managing and monitoring smart farming devices. The app provides real-time monitoring of sensors, device management, and automated control of farming equipment.
+A smart farming solution that helps monitor and control your farm automation system. This implementation focuses on Day 9's requirements: Firebase integration for actuator control and real-time device state management.
 
 ## Features
 
-- **Authentication**
-  - Secure user login and registration
-  - Firebase Authentication integration
-  - Persistent login state
+### Day 9: Firebase Integration & Actuator Control
+- Real-time actuator control through Firebase Firestore
+- Secure device state management
+- Firestore security rules implementation
+- User authentication and device ownership
+- Real-time status synchronization
 
-- **Home Dashboard**
-  - Welcome screen with user information
-  - Quick access to key features
-  - Modern Material Design 3 UI
+### Implemented Components
+1. **Firebase Integration**
+   - Cloud Firestore database setup
+   - Real-time data synchronization
+   - Security rules implementation
+   - Device state management
 
-- **Device Management**
-  - Add new devices via QR code scanning
-  - Real-time device status monitoring
-  - Edit device names and locations
-  - Remove devices from the system
+2. **Actuator Control Interface**
+   - Water Supply Control
+   - Light Control
+   - Motor Control
+   - Auto Mode Toggle
+   - Real-time status updates
+   - Loading and error states
+   - Visual feedback for state changes
 
-- **Sensor Monitoring**
-  - Real-time temperature readings
-  - Humidity monitoring
-  - Soil moisture tracking
-  - Historical data visualization
+3. **Database Structure**
+```
+/actuators/{deviceId}/
+  - motor: boolean
+  - light: boolean
+  - waterSupply: boolean
+  - autoMode: boolean
+  - lastUpdated: timestamp
 
-- **Actuator Control**
-  - Remote control of water supply
-  - Lighting system management
-  - Motor control for automation
+/users/{userId}/
+  - email: string
+  - name: string
+  - phone: string
+  - preferredLanguage: string
+  - createdAt: timestamp
+  - updatedAt: timestamp
 
-## Technical Details
+/users/{userId}/devices/{deviceId}/
+  - registeredAt: timestamp
+```
 
-### Dependencies
+## Setup Instructions
 
+1. **Prerequisites**
+   - Flutter SDK (3.0.0 or higher)
+   - Firebase account
+   - Android Studio / VS Code
+
+2. **Firebase Setup**
+   - Create a new Firebase project
+   - Enable Authentication (Email/Password)
+   - Create Cloud Firestore database
+   - Add Android/iOS apps in Firebase Console
+   - Download and add configuration files
+     - `google-services.json` for Android
+     - `GoogleService-Info.plist` for iOS
+
+3. **Project Setup**
+```bash
+# Clone the repository
+git clone [repository-url]
+
+# Navigate to project directory
+cd autofarmer
+
+# Install dependencies
+flutter pub get
+
+# Run the app
+flutter run
+```
+
+4. **Firebase Security Rules**
+Copy and paste these rules in Firebase Console:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function ownsDevice(deviceId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)/devices/$(deviceId));
+    }
+
+    // User profile rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // User's devices
+      match /devices/{deviceId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Actuator state rules
+    match /actuators/{deviceId} {
+      allow read: if isAuthenticated() && ownsDevice(deviceId);
+      allow write: if isAuthenticated() && ownsDevice(deviceId);
+    }
+  }
+}
+```
+
+## Key Files
+- `lib/screens/actuator_control_screen.dart`: Main actuator control interface
+- `lib/services/auth_service.dart`: Firebase authentication and device management
+- `firestore.rules`: Firestore security rules
+- `lib/main.dart`: App initialization and Firebase setup
+
+## Dependencies
 ```yaml
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.32.0
+  firebase_core: ^2.24.2
+  cloud_firestore: ^4.14.0
   firebase_auth: ^4.16.0
-  cloud_firestore: ^4.17.5
   provider: ^6.0.5
-  barcode_scan2: ^4.3.0
-  fl_chart: ^0.66.2
-```
-
-### Requirements
-
-- Flutter SDK: >=3.0.6 <4.0.0
-- Android SDK: API 21 or higher
-- iOS: 11.0 or higher
-
-### Firebase Setup
-
-1. Create a new Firebase project
-2. Add Android and iOS apps to your Firebase project
-3. Download and add the configuration files:
-   - Android: `google-services.json`
-   - iOS: `GoogleService-Info.plist`
-
-## Getting Started
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/autofarmer.git
-```
-
-2. Install dependencies:
-```bash
-flutter pub get
-```
-
-3. Run the app:
-```bash
-flutter run
-```
-
-## Project Structure
-
-```
-lib/
-├── main.dart
-├── firebase_options.dart
-├── models/
-│   ├── device.dart
-│   ├── sensor_data_model.dart
-│   ├── sensor_history_model.dart
-│   └── actuator_state_model.dart
-├── screens/
-│   ├── home_screen.dart
-│   ├── login_screen.dart
-│   ├── device_manager_screen.dart
-│   ├── sensor_data_screen.dart
-│   └── sensor_history_screen.dart
-└── services/
-    └── device_service.dart
 ```
 
 ## Contributing
-
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
@@ -108,11 +139,4 @@ lib/
 5. Open a Pull Request
 
 ## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Flutter team for the amazing framework
-- Firebase for the backend services
-- All contributors who participate in this project
+This project is licensed under the MIT License - see the LICENSE file for details

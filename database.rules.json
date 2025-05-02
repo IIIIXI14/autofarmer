@@ -1,0 +1,47 @@
+{
+  "rules": {
+    "devices": {
+      "$userId": {
+        "$deviceId": {
+          // Allow read/write only if authenticated with the correct user ID
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null && auth.uid == $userId",
+          
+          // Allow ESP8266 read/write access using database secret
+          ".read": "auth == null",  // When using database secret
+          ".write": "auth == null", // When using database secret
+          
+          // Validate data structure
+          ".validate": "newData.hasChildren(['pump', 'light', 'siren', 'autoMode'])",
+          "pump": {
+            ".validate": "newData.isBoolean()"
+          },
+          "light": {
+            ".validate": "newData.isBoolean()"
+          },
+          "siren": {
+            ".validate": "newData.isBoolean()"
+          },
+          "autoMode": {
+            ".validate": "newData.isBoolean()"
+          },
+          "sensors": {
+            ".validate": "newData.hasChildren(['temperature', 'humidity', 'soilMoisture', 'timestamp'])",
+            "temperature": {
+              ".validate": "newData.isNumber() && newData.val() >= -50 && newData.val() <= 100"
+            },
+            "humidity": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+            },
+            "soilMoisture": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+            },
+            "timestamp": {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        }
+      }
+    }
+  }
+} 

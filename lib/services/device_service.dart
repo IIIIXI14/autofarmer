@@ -38,6 +38,15 @@ class DeviceService {
       'lastActive': Timestamp.now(),
       'addedAt': Timestamp.now(),
     });
+
+    // Initialize actuator states
+    await _firestore.collection('actuators').doc(deviceId).set({
+      'motor': false,
+      'light': false,
+      'waterSupply': false,
+      'autoMode': false,
+      'lastUpdated': Timestamp.now(),
+    });
   }
 
   // Update device status
@@ -61,12 +70,16 @@ class DeviceService {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not logged in');
 
+    // Delete device document
     await _firestore
         .collection('users')
         .doc(userId)
         .collection('devices')
         .doc(deviceId)
         .delete();
+
+    // Delete associated actuator states
+    await _firestore.collection('actuators').doc(deviceId).delete();
   }
 
   // Update device details
@@ -82,6 +95,21 @@ class DeviceService {
         .update({
       'name': name,
       'location': location,
+    });
+  }
+
+  // Update actuator state
+  Future<void> updateActuatorState(
+    String deviceId,
+    String actuator,
+    bool value,
+  ) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not logged in');
+
+    await _firestore.collection('actuators').doc(deviceId).update({
+      actuator: value,
+      'lastUpdated': Timestamp.now(),
     });
   }
 } 

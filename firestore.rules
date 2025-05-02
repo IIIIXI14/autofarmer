@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function ownsDevice(deviceId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)/devices/$(deviceId));
+    }
+    
+    function isValidActuatorData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['waterPump', 'lights', 'siren', 'autoMode']) &&
+        data.waterPump is bool &&
+        data.lights is bool &&
+        data.siren is bool &&
+        data.autoMode is bool;
+    }
+
+    // User profile rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && isOwner(userId);
+      
+      // User's devices
+      match /devices/{deviceId} {
+        allow read, write: if isAuthenticated() && isOwner(userId);
+      }
+    }
+    
+    // Sensor data rules
+    match /sensors_data/{deviceId} {
+      allow read, write: if isAuthenticated() && ownsDevice(deviceId);
+    }
+    
+    // Sensor history rules
+    match /sensors_data_history/{deviceId}/readings/{readingId} {
+      allow read, write: if isAuthenticated() && ownsDevice(deviceId);
+    }
+    
+    // Actuator state rules
+    match /devices/{deviceId} {
+      allow read: if isAuthenticated() && ownsDevice(deviceId);
+      allow write: if isAuthenticated() && 
+                   ownsDevice(deviceId) && 
+                   isValidActuatorData();
+    }
+    
+    // For testing only - comment out in production
+    // match /devices/{deviceId} {
+    //   allow read, write: if true;
+    // }
+  }
+} 
